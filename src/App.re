@@ -36,7 +36,7 @@ let renderDesc = desc =>
   | None => "No desciption :("
   };
 
-let repoItems = (username, repos) =>
+let repoItems = (user, repos) =>
   repos
   |> List.map(repo =>
        <li
@@ -51,7 +51,7 @@ let repoItems = (username, repos) =>
                className="no-underline text-pink-dark mr-2">
                (
                  ReasonReact.stringToElement(
-                   repo.owner == username ? repo.name : repo.full_name
+                   repo.owner == user ? repo.name : repo.full_name
                  )
                )
              </a>
@@ -177,7 +177,7 @@ let make = _children => {
                 className="appearance-none p-0 w-full text-grey-darker border rounded">
                 (
                   ReasonReact.arrayToElement(
-                    repos |> repoItems(state.username) |> Array.of_list
+                    repos |> repoItems(state.user) |> Array.of_list
                   )
                 )
               </ul>
