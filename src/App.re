@@ -1,4 +1,4 @@
-type webData('a) = RemoteData.t('a, string);
+type webData('a) = RemoteData.t('a, 'a, string);
 
 type repo = {
   id: int,
@@ -8,7 +8,7 @@ type repo = {
   stars: int,
   html_url: string,
   description: option(string),
-  fork: bool
+  fork: bool,
 };
 
 type action =
@@ -21,7 +21,7 @@ type action =
 type state = {
   username: string,
   user: string,
-  repos: webData(list(repo))
+  repos: webData(list(repo)),
 };
 
 let forkPath = "M8 1a1.993 1.993 0 0 0-1 3.72V6L5 8 3 6V4.72A1.993 1.993 0 0 0 2 1a1.993 1.993 0 0 0-1 3.72V6.5l3 3v1.78A1.993 1.993 0 0 0 5 15a1.993 1.993 0 0 0 1-3.72V9.5l3-3V4.72A1.993 1.993 0 0 0 8 1zM2 4.2C1.34 4.2.8 3.65.8 3c0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2zm3 10c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2zm3-10c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2z";
@@ -31,7 +31,7 @@ let svgPath = "M15.2 40.6c-.2 0-.4-.1-.6-.2-.4-.3-.5-.7-.4-1.1l3.9-12-10.2-7.5c-
 let component = ReasonReact.reducerComponent("App");
 
 let renderDesc = desc =>
-  switch desc {
+  switch (desc) {
   | Some(str) => str
   | None => "No desciption :("
   };
@@ -50,8 +50,8 @@ let repoItems = (user, repos) =>
                target="_blank"
                className="no-underline text-pink-dark mr-2">
                (
-                 ReasonReact.stringToElement(
-                   repo.owner == user ? repo.name : repo.full_name
+                 ReasonReact.string(
+                   repo.owner == user ? repo.name : repo.full_name,
                  )
                )
              </a>
@@ -62,17 +62,17 @@ let repoItems = (user, repos) =>
                    viewBox="0 0 10 16">
                    <path fillRule="evenodd" d=forkPath />
                  </svg> :
-                 ReasonReact.nullElement
+                 ReasonReact.null
              )
            </div>
            <p className="font-mono text-pink-lighter text-xs">
-             (repo.description |> renderDesc |> ReasonReact.stringToElement)
+             (repo.description |> renderDesc |> ReasonReact.string)
            </p>
          </div>
          <div className="flex flex-row items-center px-6 py-4">
            <span
              className="font-mono inline-block rounded-full px-1 py-1 text-sm text-pink-dark mr-1">
-             (ReasonReact.stringToElement(string_of_int(repo.stars)))
+             (ReasonReact.string(string_of_int(repo.stars)))
            </span>
            <svg
              className="fill-current text-orange-light h-4 w-4 inline-block"
@@ -88,7 +88,7 @@ let fetchRepos = ({ReasonReact.state, send}) => {
     Fetch.fetch(
       "https://api.github.com/users/"
       ++ state.username
-      ++ "/repos?type=all&sort=updated"
+      ++ "/repos?type=all&sort=updated",
     )
     |> then_(Fetch.Response.json)
     |> then_(json =>
@@ -104,7 +104,7 @@ let fetchRepos = ({ReasonReact.state, send}) => {
                 stars: json |> field("stargazers_count", int),
                 html_url: json |> field("html_url", string),
                 description: json |> optional(field("description", string)),
-                fork: json |> field("fork", bool)
+                fork: json |> field("fork", bool),
               }
             )
          |> Array.to_list
@@ -124,15 +124,23 @@ let make = _children => {
   ...component,
   initialState: () => {username: "", user: "", repos: RemoteData.NotAsked},
   reducer: (action, state) =>
-    switch action {
+    switch (action) {
     | ChangeUsername(username) => ReasonReact.Update({...state, username})
-    | SearchEnterKeyDown => ReasonReact.SideEffects((self => fetchRepos(self)))
+    | SearchEnterKeyDown =>
+      ReasonReact.SideEffects((self => fetchRepos(self)))
     | Loading =>
+      let existingData =
+        switch (state.repos) {
+        | NotAsked
+        | Loading(_)
+        | Failure(_) => []
+        | Success(s) => s
+        };
       ReasonReact.Update({
         ...state,
         user: state.username,
-        repos: RemoteData.Loading
-      })
+        repos: RemoteData.Loading(existingData),
+      });
     | ReposLoaded(repos) =>
       ReasonReact.Update({...state, repos: RemoteData.Success(repos)})
     | ReposError(err) =>
@@ -147,51 +155,60 @@ let make = _children => {
         value=state.username
         onKeyDown=(
           event =>
-            if (ReactEventRe.Keyboard.keyCode(event) === 13) {
-              ReactEventRe.Keyboard.preventDefault(event);
+            if (ReactEvent.Keyboard.keyCode(event) === 13) {
+              ReactEvent.Keyboard.preventDefault(event);
               send(SearchEnterKeyDown);
             }
         )
         onChange=(
           event =>
-            send(
-              ChangeUsername(
-                ReactDOMRe.domElementToObj(ReactEventRe.Form.target(event))##value
-              )
-            )
+            send(ChangeUsername(ReactEvent.Form.target(event)##value))
         )
       />
       (
-        switch state.repos {
-        | NotAsked => ReasonReact.nullElement
-        | Loading =>
-          <p className="mt-8 font-mono text-pink text-lg">
-            (ReasonReact.stringToElement("Loading..."))
-          </p>
-        | Failure(e) => <p> (ReasonReact.stringToElement(e)) </p>
+        switch (state.repos) {
+        | NotAsked => ReasonReact.null
+        | Failure(e) => <p> (ReasonReact.string(e)) </p>
+        | Loading(repos)
         | Success(repos) =>
-          if (List.length(repos) > 0) {
-            <div
-              className="bg-white shadow rounded flex overflow-scroll w-2/5 mb-8 mt-8">
-              <ul
-                className="appearance-none p-0 w-full text-grey-darker border rounded">
-                (
-                  ReasonReact.arrayToElement(
-                    repos |> repoItems(state.user) |> Array.of_list
+          let isLoading = RemoteData.isLoading(state.repos);
+          <>
+            (
+              if (isLoading) {
+                <p className="mt-8 font-mono text-pink text-lg">
+                  (ReasonReact.string("Loading..."))
+                </p>;
+              } else {
+                ReasonReact.null;
+              }
+            )
+            (
+              if (List.length(repos) > 0) {
+                <div
+                  className="bg-white shadow rounded flex overflow-scroll w-2/5 mb-8 mt-8">
+                  <ul
+                    className="appearance-none p-0 w-full text-grey-darker border rounded">
+                    (
+                      ReasonReact.array(
+                        repos |> repoItems(state.user) |> Array.of_list,
+                      )
+                    )
+                  </ul>
+                </div>;
+              } else if (! isLoading) {
+                <p className="mt-8 font-mono text-pink text-lg">
+                  (
+                    ReasonReact.string(
+                      state.user ++ " " ++ "does not have any public repos",
+                    )
                   )
-                )
-              </ul>
-            </div>;
-          } else {
-            <p className="mt-8 font-mono text-pink text-lg">
-              (
-                ReasonReact.stringToElement(
-                  state.user ++ " " ++ "does not have any public repos"
-                )
-              )
-            </p>;
-          }
+                </p>;
+              } else {
+                ReasonReact.null;
+              }
+            )
+          </>;
         }
       )
-    </div>
+    </div>,
 };
