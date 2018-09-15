@@ -11,8 +11,8 @@
   "suffix": ".bs.js",
   "namespace": true,
   "bs-dependencies": [
+    "@glennsl/bs-json",
     "bs-fetch",
-    "bs-json",
     "reason-react",
     "remotedata-re"
   ],
