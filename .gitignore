@@ -62,3 +62,4 @@ lib/
 *.bs.js
 .cache
 dist
+.bsb.lock
